@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Sirion Intent Router",
+  "description": "An application to generate, visualize, and simulate the execution of multi-agent Contract Lifecycle Management (CLM) orchestration plans using a Planner-Executor model.",
+  "requestFramePermissions": []
+}
