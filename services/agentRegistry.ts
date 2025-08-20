@@ -6,7 +6,7 @@ export interface AgentProfile {
     version: number;
 }
 
-const STORAGE_KEY = 'sirion.agent.profile.v1';
+const STORAGE_KEY = 'sirion.agent.profile.v2';
 
 export function loadProfile(): AgentProfile {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
