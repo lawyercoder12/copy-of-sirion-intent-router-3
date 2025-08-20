@@ -8,7 +8,7 @@ export function buildPlannerSystemInstruction(agents: AgentDefinition[], overrid
 
     const replaced = PLANNER_SYSTEM_INSTRUCTION.replace(
         /\*\*AVAILABLE AGENTS:[\s\S]*?Now, based on the user's request, generate the plan\./,
-        `**AVAILABLE AGENTS:**\n${available}\n\nNow, based on the user's request, generate the plan.`
+        `**AVAILABLE AGENTS:**\n${available}\n\n**AGENT ID CONTRACT:**\n- For each step of type "agent_call", the field "agent_id" MUST be exactly one of the IDs listed above.\n- Do not append parentheses, labels, or aliases.\n- If you need a human-readable label, put it in the step's "id" or within parameters, NOT in "agent_id".\n- Never include '(' or ')' in the "agent_id" value.\n\nNow, based on the user's request, generate the plan.`
     );
 
     return overrides ? `${replaced}\n\n${overrides}` : replaced;

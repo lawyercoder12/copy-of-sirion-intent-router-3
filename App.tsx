@@ -170,6 +170,30 @@ const App: React.FC = () => {
         const plannerInstr = buildPlannerSystemInstruction(agents);
         const mockInstr = buildMockInstruction(agents);
         plannerService.current.setSystemInstructions(plannerInstr, mockInstr);
+        const enabledIds = agents.filter(a => a.enabled).map(a => a.id);
+        plannerService.current.setAvailableAgentIds(enabledIds);
+    }, [agents]);
+
+    // Surface a clear profile integrity error as a chat turn if required agents are missing
+    useEffect(() => {
+        const required = ['ai_redlining', 'share_with_counterparty', 'esignature_orchestrator'];
+        const enabledSet = new Set(agents.filter(a => a.enabled).map(a => a.id));
+        const missing = required.filter(r => !enabledSet.has(r));
+        if (missing.length > 0 && historyRef.current.length === 0) {
+            const turnId = uuidv4();
+            setHistory(prev => [...prev, {
+                id: turnId,
+                prompt: '[SYSTEM]',
+                plan: null,
+                executionState: null,
+                isExecuting: false,
+                isAwaitingInputOnStep: null,
+                error: `Unknown agent(s): ${missing.join(', ')}. Choose from: ${Array.from(enabledSet).join(', ')} or import the correct profile.`,
+                finalSummary: null,
+                isSummarizing: false,
+                thinkingLog: [],
+            }]);
+        }
     }, [agents]);
 
 
@@ -230,7 +254,11 @@ const App: React.FC = () => {
                 },
                 async (agentId, parameters) => {
                     const def = agents.find(a => a.id === agentId);
-                    if (def && def.type === 'real') {
+                    if (!def || !def.enabled) {
+                        const enabledIds = agents.filter(a => a.enabled).map(a => a.id).join(', ');
+                        throw new Error(`Unknown agent id: ${agentId}. Choose from: ${enabledIds} or import the correct profile.`);
+                    }
+                    if (def.type === 'real') {
                         return { info: 'Real agent execution coming soon.' };
                     }
                     return plannerService.current.mockAgentExecution(agentId, parameters);
@@ -416,6 +444,13 @@ Successful step outputs:\n${successfulSteps || 'None'}`;
 
         try {
             const plan = await plannerService.current.generate(fullPlannerPrompt);
+            // Profile integrity check for commonly used orchestrators
+            const required = ['ai_redlining', 'share_with_counterparty', 'esignature_orchestrator'];
+            const enabledSet = new Set(agents.filter(a => a.enabled).map(a => a.id));
+            const missing = required.filter(r => !enabledSet.has(r));
+            if (missing.length > 0) {
+                throw new Error(`Unknown agent(s): ${missing.join(', ')}. Choose from: ${Array.from(enabledSet).join(', ')} or import the correct profile.`);
+            }
             const executionState = createInitialExecutionState(plan);
 
             setHistory(prev => produce(prev, draft => {

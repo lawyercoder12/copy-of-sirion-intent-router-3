@@ -32,6 +32,12 @@ export class PlanExecutor {
     this.onStepSuccess = onStepSuccess;
   }
 
+  private sanitizeAgentId(raw: string): string {
+    if (!raw) return raw;
+    // Remove any trailing parenthesized label and trim whitespace
+    return raw.replace(/\s*\(.*\)\s*$/, '').trim();
+  }
+
   private produceNewState(fn: (draft: Draft<ExecutionState>) => void) {
       // This function now just updates the internal state.
       // The React state update is handled by the passed-in `stateUpdater`.
@@ -190,26 +196,32 @@ export class PlanExecutor {
       draft.steps[step.id].parameters = parameters;
     });
 
-    if (step.agent_id === 'human_assistant') {
+    const rawAgentId = step.agent_id;
+    const resolvedAgentId = this.sanitizeAgentId(rawAgentId);
+    if (resolvedAgentId !== rawAgentId) {
+      this.addTelemetry({ event: 'dependency_analysis', step_id: step.id, agent_id: resolvedAgentId, preview: { message: `Sanitized agent_id from "${rawAgentId}" to "${resolvedAgentId}"` } });
+    }
+
+    if (resolvedAgentId === 'human_assistant') {
       this.wasPausedForInput = true; // Set the flag
       this.produceNewState(draft => {
         draft.steps[step.id].status = 'awaiting_input';
       });
-      this.addTelemetry({ event: 'hitl_requested', step_id: step.id, agent_id: step.agent_id, preview: { message: `Awaiting user input for: "${parameters.prompt}"` } });
+      this.addTelemetry({ event: 'hitl_requested', step_id: step.id, agent_id: resolvedAgentId, preview: { message: `Awaiting user input for: "${parameters.prompt}"` } });
       this.onHumanInputRequired(step.id);
       throw new Error("HUMAN_INPUT_REQUIRED");
     }
 
-    if (step.agent_id === 'branch_orchestrator') {
+    if (resolvedAgentId === 'branch_orchestrator') {
         this.produceNewState(draft => {
             draft.steps[step.id].status = 'awaiting_continuation';
         });
-        this.addTelemetry({ event: 'continuation_required', step_id: step.id, agent_id: step.agent_id, preview: { message: `Plan paused for conditional execution. Condition: "${parameters.conditionsPrompt}"` } });
+        this.addTelemetry({ event: 'continuation_required', step_id: step.id, agent_id: resolvedAgentId, preview: { message: `Plan paused for conditional execution. Condition: "${parameters.conditionsPrompt}"` } });
         return { result: "Paused for continuation. The App will re-plan." }; // Return a success-like object
     }
 
     await new Promise(res => setTimeout(res, 500 + Math.random() * 1000));
-    const output = await this.executeAgent(step.agent_id, parameters);
+    const output = await this.executeAgent(resolvedAgentId, parameters);
     
     if (output.error) {
         throw new Error(typeof output.details === 'string' ? output.details : JSON.stringify(output.error));

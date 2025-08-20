@@ -11,7 +11,7 @@ if (!API_KEY) {
 const ai = new GoogleGenAI({ apiKey: API_KEY! });
 const model = "gemini-2.5-flash";
 
-const stepSchemaDefinition = (depth = 0): any => {
+const stepSchemaDefinition = (depth = 0, agentIdEnum?: string[]): any => {
     if (depth > 4) {
       return {
         type: Type.OBJECT,
@@ -19,7 +19,9 @@ const stepSchemaDefinition = (depth = 0): any => {
         properties: {
           id: { type: Type.STRING, description: "A unique identifier for the step." },
           type: { type: Type.STRING, enum: ["agent_call"], description: "Must be 'agent_call' at this depth." },
-          agent_id: { type: Type.STRING, description: "The agent ID to be called." },
+          agent_id: agentIdEnum && agentIdEnum.length > 0 
+            ? { type: Type.STRING, enum: agentIdEnum, description: "The agent ID to be called (must be one of AVAILABLE_AGENTS IDs)." }
+            : { type: Type.STRING, description: "The agent ID to be called." },
           parameters: { type: Type.STRING, description: "A minified JSON string of parameters for the agent call." },
           branch_key: { type: Type.STRING },
           loop_key: { type: Type.STRING },
@@ -28,14 +30,16 @@ const stepSchemaDefinition = (depth = 0): any => {
       };
     }
   
-    const recursiveStep = stepSchemaDefinition(depth + 1);
+    const recursiveStep = stepSchemaDefinition(depth + 1, agentIdEnum);
   
     return {
       type: Type.OBJECT,
       properties: {
         id: { type: Type.STRING, description: "A unique identifier for the step." },
         type: { type: Type.STRING, enum: ["agent_call", "sequential", "parallel"] },
-        agent_id: { type: Type.STRING, description: "The agent ID (for 'agent_call' type only)." },
+        agent_id: agentIdEnum && agentIdEnum.length > 0 
+            ? { type: Type.STRING, enum: agentIdEnum, description: "The agent ID (for 'agent_call' type only)." }
+            : { type: Type.STRING, description: "The agent ID (for 'agent_call' type only)." },
         parameters: { type: Type.STRING, description: "A minified JSON string of parameters (for 'agent_call' type only). Example: '{\"document_id\":\"doc-123\"}'" },
         tasks: { type: Type.ARRAY, description: "A list of sub-steps (for 'sequential' or 'parallel' types only).", items: recursiveStep },
         branch_key: { type: Type.STRING },
@@ -45,22 +49,23 @@ const stepSchemaDefinition = (depth = 0): any => {
     };
   };
 
-const planSchema = {
+const planSchemaTemplate = (agentIdEnum?: string[]) => ({
     type: Type.OBJECT,
     properties: {
         plan_id: { type: Type.STRING, description: "A unique identifier (UUID or ULID) for the plan." },
         name: { type: Type.STRING, description: "A short, descriptive title for the plan." },
         description: { type: Type.STRING, description: "A one or two sentence summary of the plan's goal." },
-        root: stepSchemaDefinition()
+        root: stepSchemaDefinition(0, agentIdEnum)
     },
     required: ["plan_id", "name", "description", "root"]
-};
+});
 
 
 class Planner {
     private chat: Chat | null = null;
     private plannerSystemInstruction: string = PLANNER_SYSTEM_INSTRUCTION;
     private mockInstruction: string = MOCK_AGENT_SYSTEM_INSTRUCTION_ENHANCED;
+    private agentIdEnum: string[] | undefined = undefined;
     
     constructor() {
         if (!API_KEY) {
@@ -75,7 +80,13 @@ class Planner {
         this.resetChat();
     }
 
+    public setAvailableAgentIds(ids: string[]) {
+        this.agentIdEnum = ids;
+        this.resetChat();
+    }
+
     public resetChat() {
+        const planSchema = planSchemaTemplate(this.agentIdEnum);
         this.chat = ai.chats.create({
             model: model,
             config: {
