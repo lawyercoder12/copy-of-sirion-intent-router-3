@@ -81,11 +81,20 @@ const StepNode: React.FC<{ step: Step; executionState: ExecutionState | null; le
   }
   
   if (!stepInfo) {
-    stepInfo = {
-        name: `Unknown: ${step.type === 'agent_call' ? step.agent_id : step.type}`,
-        description: "This step or agent ID is not recognized by the application.",
+    if (step.type === 'agent_call') {
+      const normalizedAgentId = (step.agent_id || '').toLowerCase().split('(')[0].trim();
+      stepInfo = {
+        name: normalizedAgentId || 'Agent',
+        description: 'Agent from plan (not present in current profile).',
+        icon: null,
+      };
+    } else {
+      stepInfo = {
+        name: `Unknown: ${step.type}`,
+        description: 'This step type is not recognized by the application.',
         icon: <QuestionMarkCircleIcon />
-    };
+      };
+    }
   }
 
   const iconNode = stepInfo?.icon ?? <CodeIcon className="w-6 h-6" />;
