@@ -74,6 +74,7 @@ export interface ExecutionState {
     mediator: { summary: string | null };
     obligations: any[];
   };
+  context?: Record<string, any>;
   steps: Record<string, StepResult>;
   trace: TelemetryEvent[];
 }
@@ -90,7 +91,9 @@ export type TelemetryEventType =
   | 'loop_iteration'
   | 'hitl_requested'
   | 'hitl_response_received'
-  | 'continuation_required';
+  | 'continuation_required'
+  | 'context_updated'
+  | 'duplicate_elided';
 
 export interface TelemetryEvent {
   event: TelemetryEventType;

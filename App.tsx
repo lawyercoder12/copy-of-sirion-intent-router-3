@@ -201,7 +201,7 @@ const App: React.FC = () => {
     }, [agents]);
 
 
-    const createInitialExecutionState = (plan: Plan): ExecutionState => {
+    const createInitialExecutionState = (plan: Plan, seedContext?: Record<string, any>): ExecutionState => {
         const steps: Record<string, any> = {};
         const collectSteps = (step: Step) => {
             steps[step.id] = { status: 'pending', started_at: null, ended_at: null, output: null, error: null, parameters: null, emissions: [] };
@@ -212,6 +212,7 @@ const App: React.FC = () => {
         collectSteps(plan.root);
         return {
             metadata: { doc_type: null, review_status: null, assumptions: [], mediator: { summary: null }, obligations: [] },
+            context: seedContext ? { ...seedContext } : {},
             steps,
             trace: [{ event: 'plan_created', ts: new Date().toISOString(), plan_id: plan.plan_id, step_id: null, preview: { message: `Plan "${plan.name}" created.` } }],
         };
@@ -296,7 +297,11 @@ const App: React.FC = () => {
                 
                 const { inputValue, conditionsPrompt } = stepResult.parameters || {};
                 const continuationUserPrompt = `[CONTINUATION]${originalUserPrompt}`;
-                const continuationPlannerPrompt = `[CONTINUATION CONTEXT]
+                const ctxBlock = JSON.stringify(finalState.context || {});
+                const continuationPlannerPrompt = `[CTX]
+${ctxBlock}
+
+[CONTINUATION CONTEXT]
 The user's original goal was: "${originalUserPrompt}"
 A previous step gathered data for a condition. The result is: ${JSON.stringify(inputValue)}
 The condition to evaluate is: "${conditionsPrompt}"
@@ -424,11 +429,16 @@ Plan name: "${turn.plan?.name}"
 Successful step outputs:\n${successfulSteps || 'None'}`;
             }).join('\n\n---\n\n');
 
+        const carryContext = historyRef.current
+            .map(t => t.executionState?.context || {})
+            .reduce((acc, cur) => ({ ...acc, ...cur }), {} as Record<string, any>);
+        const ctxBlock = Object.keys(carryContext).length ? `[CTX]\n${JSON.stringify(carryContext)}\n\n` : '';
+
         const fullPlannerPrompt = plannerPromptOverride // This is for HITL and Branching
             ? plannerPrompt 
             : (previousTurnsContext 
-                ? `[PREVIOUS TURN CONTEXT]\n${previousTurnsContext}\n\n[CURRENT GOAL]\n${plannerPrompt}`
-                : plannerPrompt);
+                ? `${ctxBlock}[PREVIOUS TURN CONTEXT]\n${previousTurnsContext}\n\n[CURRENT GOAL]\n${plannerPrompt}`
+                : `${ctxBlock}${plannerPrompt}`);
         
         // Create the new turn object to be added to history
         const newTurn: ChatTurn = {
@@ -455,7 +465,7 @@ Successful step outputs:\n${successfulSteps || 'None'}`;
             if (missing.length > 0) {
                 throw new Error(`Unknown agent(s): ${missing.join(', ')}. Choose from: ${Array.from(enabledSet).join(', ')} or import the correct profile.`);
             }
-            const executionState = createInitialExecutionState(plan);
+            const executionState = createInitialExecutionState(plan, carryContext);
 
             setHistory(prev => produce(prev, draft => {
                 const turn = draft.find(t => t.id === currentTurnId);
