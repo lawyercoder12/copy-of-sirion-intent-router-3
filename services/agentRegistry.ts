@@ -33,6 +33,18 @@ export function defaultProfile(): AgentProfile {
     };
 }
 
+export function mergeDefaults(profile: AgentProfile): { profile: AgentProfile; changed: boolean } {
+    const def = defaultProfile();
+    const existingIds = new Set(profile.agents.map(a => a.id));
+    const toAdd = def.agents.filter(a => !existingIds.has(a.id));
+    if (toAdd.length === 0) return { profile, changed: false };
+    const merged: AgentProfile = {
+        ...profile,
+        agents: [...profile.agents, ...toAdd]
+    };
+    return { profile: merged, changed: true };
+}
+
 function seedDefaultAgents(): AgentDefinition[] {
     return [
         { id: 'talk_to_corpus', name: 'AskSirion Corpus (Talk-to-Corpus)', description: 'Corpus-level conversational search with drill-down to documents; yields synthesized answers, tables, and citations.', whenToUse: 'When the user asks broad corpus-level questions or analytics across many documents.', type: 'mock', enabled: true, icon: 'talk_to_corpus', mockBehavior: 'Return {answer:"<synthesized>" , tables:[{title:"Top Clauses", rows:[...]}], citations:[{doc:"<name>", section:"<id>"}]}.' },

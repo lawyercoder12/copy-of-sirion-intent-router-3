@@ -1,6 +1,7 @@
 import { PlanExecutor } from '../services/planExecutor';
 import { ExecutionState, Plan, Step, AgentCallStep, SequentialStep } from '../types';
 import { buildPlannerSystemInstruction } from '../services/promptBuilder';
+import { mergeDefaults, defaultProfile } from '../services/agentRegistry';
 
 function assert(condition: any, message: string) {
   if (!condition) throw new Error(message);
@@ -39,6 +40,11 @@ async function testPlannerContractPrompt() {
 }
 
 async function testEndToEndFlow() {
+  // Ensure defaults include orchestrators used in test
+  const merged = mergeDefaults(defaultProfile());
+  if (!merged.profile.agents.find(a => a.id === 'family_of_contracts_orchestrator')) throw new Error('Missing family_of_contracts_orchestrator');
+  if (!merged.profile.agents.find(a => a.id === 'obligation_management')) throw new Error('Missing obligation_management');
+  if (!merged.profile.agents.find(a => a.id === 'multi_supplier_contract_manager')) throw new Error('Missing multi_supplier_contract_manager');
   const s1: AgentCallStep = { id: 'apply_redlines', type: 'agent_call', agent_id: 'ai_redlining', parameters: { documentId: 'd1', playbookId: 'p1' } };
   const s2: AgentCallStep = { id: 'share_document', type: 'agent_call', agent_id: 'share_with_counterparty', parameters: { documentId: '{{steps.apply_redlines.output.documentId}}', recipient: 'counterparty@example.com' } };
   const s3: AgentCallStep = { id: 'pause_for_branch', type: 'agent_call', agent_id: 'branch_orchestrator', parameters: { inputValue: '{{steps.share_document.output.status}}', conditionsPrompt: 'If accepted, proceed to e-signature; otherwise, stop.' } };

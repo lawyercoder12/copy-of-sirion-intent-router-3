@@ -18,7 +18,7 @@ import { SirionLogo } from './components/icons/SirionLogo';
 import { ThemeToggle } from './components/ThemeToggle';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigPage } from './components/ConfigPage';
-import { loadProfile } from './services/agentRegistry';
+import { loadProfile, mergeDefaults, saveProfile } from './services/agentRegistry';
 import { buildPlannerSystemInstruction, buildMockInstruction } from './services/promptBuilder';
 
 
@@ -148,9 +148,13 @@ const App: React.FC = () => {
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
     const historyRef = useRef(history);
     historyRef.current = history;
-    const initialProfile = loadProfile();
-    const [agents, setAgents] = useState<AgentDefinition[]>(initialProfile.agents);
-    const [profileName, setProfileName] = useState<string>(initialProfile.name);
+    const loaded = loadProfile();
+    const merged = mergeDefaults(loaded);
+    if (merged.changed) {
+        try { saveProfile(merged.profile); } catch {}
+    }
+    const [agents, setAgents] = useState<AgentDefinition[]>(merged.profile.agents);
+    const [profileName, setProfileName] = useState<string>(merged.profile.name);
     const [route, setRoute] = useState<'home' | 'config'>(location.hash === '#/config' ? 'config' : 'home');
     
     // Create a stable ref for handleSend to avoid dependency cycles in useCallbacks
