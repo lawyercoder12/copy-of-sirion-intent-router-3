@@ -11,6 +11,7 @@ import { SkipIcon } from './icons/SkipIcon';
 import { UserQuestionIcon } from './icons/UserQuestionIcon';
 import { QuestionMarkCircleIcon } from './icons/QuestionMarkCircleIcon';
 import { BranchOrchestratorIcon } from './icons/AgentIcon';
+import { CodeIcon } from './icons/CodeIcon';
 
 interface PlanVisualizerProps {
   plan: Plan;
@@ -87,6 +88,8 @@ const StepNode: React.FC<{ step: Step; executionState: ExecutionState | null; le
     };
   }
 
+  const iconNode = stepInfo?.icon ?? <CodeIcon className="w-6 h-6" />;
+
   const hasChildren = 'tasks' in step && step.tasks.length > 0;
   
   const originalParams = step.type === 'agent_call' ? step.parameters : {};
@@ -147,7 +150,7 @@ ${allKeys.map(key => {
              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-700 ${getStatusColor(status)}`}>
                 <div className="w-5 h-5">{getStatusIcon(status)}</div>
              </div>
-             <div className="flex-shrink-0 w-6 h-6 text-midnight dark:text-cloud">{stepInfo.icon}</div>
+             <div className="flex-shrink-0 w-6 h-6 text-midnight dark:text-cloud">{iconNode}</div>
              <div>
                 <span className="font-semibold text-midnight dark:text-cloud">{stepInfo.name}</span>
                 <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">({step.id})</span>
